@@ -1,8 +1,8 @@
 """
 Tesla Robotaxi Simulation - Streamlit Application
 
-Milestone 3: Core Configuration Controls
-Add sidebar controls for the most impactful parameters and wire them up to update simulation results.
+Milestone 5: Complete Result Tabs
+Add all remaining analysis tabs to match notebook functionality.
 """
 
 import streamlit as st
@@ -13,6 +13,16 @@ from model.config import SimulationConfig
 from model.core import run_simulation
 from model.plots import plot_global_series
 from app.sidebar import render_sidebar
+from app.tabs import (
+    render_production_fleet_tab,
+    render_robotaxi_miles_tab,
+    render_tesla_revenue_tab,
+    render_car_owner_economics_tab,
+    render_co2_pollution_tab,
+    render_displacement_tab,
+    render_time_gdp_tab,
+    render_diagnostics_tab
+)
 
 # Page configuration
 st.set_page_config(
@@ -207,124 +217,42 @@ try:
         else:
             st.warning(f"Target year {target_year} not available in results.")
         
-        # Plots
-        st.subheader("Visualizations")
+        # Create tabs for detailed results
+        st.markdown("---")
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+            "Production & Fleet",
+            "Robotaxi Miles",
+            "Tesla Revenue",
+            "Car Owner Economics",
+            "CO₂ & Pollution",
+            "Displacement & S-Curves",
+            "Time Saved & GDP",
+            "Diagnostics"
+        ])
         
-        col1, col2 = st.columns(2)
+        with tab1:
+            render_production_fleet_tab(results)
         
-        with col1:
-            st.markdown("#### Global Robotaxi Miles")
-            try:
-                fig1 = plot_global_series(
-                    results.robotaxi_miles,
-                    "Global Robotaxi Miles",
-                    results.years,
-                    12  # trillions
-                )
-                st.pyplot(fig1, use_container_width=True)
-                plt.close(fig1)  # Close figure to free memory
-            except Exception as e:
-                st.error(f"Error plotting robotaxi miles: {e}")
+        with tab2:
+            render_robotaxi_miles_tab(results)
         
-        with col2:
-            st.markdown("#### Global Tesla Revenue")
-            try:
-                fig2 = plot_global_series(
-                    results.revenue_tesla_global,
-                    "Global Revenue Tesla",
-                    results.years,
-                    9  # billions
-                )
-                st.pyplot(fig2, use_container_width=True)
-                plt.close(fig2)  # Close figure to free memory
-            except Exception as e:
-                st.error(f"Error plotting revenue: {e}")
+        with tab3:
+            render_tesla_revenue_tab(results)
         
-        # Simulation info
-        with st.expander("Simulation Details"):
-            st.write(f"**Configuration Hash**: `{current_config_hash}`")
-            st.write(f"**Number of Simulations**: {user_config.num_simulations}")
-            st.write(f"**Years Simulated**: {results.years[0]} - {results.years[-1]}")
-            st.write(f"**Total Years**: {len(results.years)}")
-            st.write(f"**Miles per Car**: {user_config.miles_per_car:,.0f}")
-            st.write(f"**Network Participation**: {user_config.network_participation:.1%}")
-            st.write(f"**Platform Fee**: {user_config.platform_fee:.1%}")
-            
-            st.markdown("---")
-            st.markdown("### Validation Data")
-            st.caption("Use this data to verify that cumulative cars and robotaxi miles increase over time")
-            
-            # Select key years for validation (2025, 2030, 2035, or closest available)
-            validation_years = []
-            for year in [2025, 2030, 2035]:
-                if year in results.years:
-                    validation_years.append(year)
-            # If none of those exist, use first, middle, and last year
-            if not validation_years:
-                validation_years = [
-                    results.years[0],
-                    results.years[len(results.years)//2],
-                    results.years[-1]
-                ]
-            
-            # Cumulative Cars by Region
-            st.markdown("#### Cumulative Cars by Region (Average)")
-            cum_cars_data = []
-            for region in sorted(results.cum_cars_by_area.keys()):
-                row = {"Region": region}
-                for year in validation_years:
-                    if year in results.cum_cars_by_area[region].columns:
-                        avg_cars = results.cum_cars_by_area[region][year].mean()
-                        row[f"{year}"] = f"{avg_cars:,.0f}"
-                    else:
-                        row[f"{year}"] = "N/A"
-                cum_cars_data.append(row)
-            
-            cum_cars_df = pd.DataFrame(cum_cars_data)
-            st.dataframe(cum_cars_df, use_container_width=True, hide_index=True)
-            
-            # Global Cumulative Cars (sum across all regions)
-            st.markdown("#### Global Cumulative Cars (Average)")
-            global_cum_cars_data = []
-            for year in validation_years:
-                total_cars = 0
-                for region in results.cum_cars_by_area.keys():
-                    if year in results.cum_cars_by_area[region].columns:
-                        total_cars += results.cum_cars_by_area[region][year].mean()
-                global_cum_cars_data.append({"Year": year, "Cumulative Cars": f"{total_cars:,.0f}"})
-            
-            global_cum_cars_df = pd.DataFrame(global_cum_cars_data)
-            st.dataframe(global_cum_cars_df, use_container_width=True, hide_index=True)
-            
-            # Robotaxi Miles (Global)
-            st.markdown("#### Global Robotaxi Miles (Average)")
-            robotaxi_miles_data = []
-            for year in validation_years:
-                if year in results.robotaxi_miles.columns:
-                    avg_miles = results.robotaxi_miles[year].mean()
-                    robotaxi_miles_data.append({
-                        "Year": year,
-                        "Robotaxi Miles (trillions)": f"{avg_miles / 1e12:.2f}"
-                    })
-            
-            robotaxi_miles_df = pd.DataFrame(robotaxi_miles_data)
-            st.dataframe(robotaxi_miles_df, use_container_width=True, hide_index=True)
-            
-            # Robotaxi Miles by Region
-            st.markdown("#### Robotaxi Miles by Region (Average)")
-            robotaxi_miles_region_data = []
-            for region in sorted(results.robotaxi_miles_per_region.keys()):
-                row = {"Region": region}
-                for year in validation_years:
-                    if year in results.robotaxi_miles_per_region[region].columns:
-                        avg_miles = results.robotaxi_miles_per_region[region][year].mean()
-                        row[f"{year} (billions)"] = f"{avg_miles / 1e9:.2f}"
-                    else:
-                        row[f"{year} (billions)"] = "N/A"
-                robotaxi_miles_region_data.append(row)
-            
-            robotaxi_miles_region_df = pd.DataFrame(robotaxi_miles_region_data)
-            st.dataframe(robotaxi_miles_region_df, use_container_width=True, hide_index=True)
+        with tab4:
+            render_car_owner_economics_tab(results)
+        
+        with tab5:
+            render_co2_pollution_tab(results)
+        
+        with tab6:
+            render_displacement_tab(results)
+        
+        with tab7:
+            render_time_gdp_tab(results)
+        
+        with tab8:
+            render_diagnostics_tab(results, current_config_hash, user_config)
     
     else:
         st.info("👆 Click 'Run Simulation' to start. Adjust parameters in the sidebar and click the button to run with your settings.")
