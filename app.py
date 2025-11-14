@@ -127,93 +127,154 @@ try:
         # Use the config that was used for this simulation
         user_config = st.session_state.get('config', user_config)
         
-        # Get 2030 values (or last available year)
-        target_year = 2030 if 2030 in results.years else results.years[-1]
+        # Year selector for Key Metrics
+        default_year = 2030 if 2030 in results.years else results.years[-1]
+        target_year = st.select_slider(
+            "Select Year",
+            options=results.years,
+            value=default_year,
+            help="Choose a year to view metrics for that specific year"
+        )
         
-        # Summary KPIs with Bear/Average/Bull scenarios
-        st.subheader(f"Key Metrics ({target_year})")
+        # Summary KPIs with improved visual hierarchy
+        st.subheader(f"📊 Key Metrics ({target_year})")
         
         if target_year in results.robotaxi_miles.columns:
-            # Calculate metrics with quantiles
-            robotaxi_miles_bear = results.robotaxi_miles[target_year].quantile(0.25)
-            robotaxi_miles_avg = results.robotaxi_miles[target_year].mean()
-            robotaxi_miles_bull = results.robotaxi_miles[target_year].quantile(0.75)
-            
+            # Calculate primary metrics with quantiles
             revenue_bear = results.revenue_tesla_global[target_year].quantile(0.25)
             revenue_avg = results.revenue_tesla_global[target_year].mean()
             revenue_bull = results.revenue_tesla_global[target_year].quantile(0.75)
             
-            # CO2 saved (USA)
-            co2_bear = 0
-            co2_avg = 0
-            co2_bull = 0
-            if 'USA' in results.tons_co2_saved and target_year in results.tons_co2_saved['USA'].columns:
-                co2_bear = results.tons_co2_saved['USA'][target_year].quantile(0.25)
-                co2_avg = results.tons_co2_saved['USA'][target_year].mean()
-                co2_bull = results.tons_co2_saved['USA'][target_year].quantile(0.75)
+            # Cumulative revenue (sum from start year to target year)
+            cumulative_revenue = results.revenue_tesla_global[results.years].sum(axis=1)
+            cum_revenue_bear = cumulative_revenue.quantile(0.25)
+            cum_revenue_avg = cumulative_revenue.mean()
+            cum_revenue_bull = cumulative_revenue.quantile(0.75)
             
-            # Display KPIs in columns (3 metrics × 3 scenarios = 9 columns, use 3 rows)
-            col1, col2, col3 = st.columns(3)
+            # Global fleet size (cumulative cars) - calculate only for target year
+            global_cum_cars_target = pd.Series(index=results.simulation_list, dtype=float)
+            for sim in results.simulation_list:
+                total = 0
+                for region in results.cum_cars_by_area.keys():
+                    if target_year in results.cum_cars_by_area[region].columns:
+                        total += results.cum_cars_by_area[region].loc[sim, target_year]
+                global_cum_cars_target.loc[sim] = total
+            
+            fleet_bear = global_cum_cars_target.quantile(0.25)
+            fleet_avg = global_cum_cars_target.mean()
+            fleet_bull = global_cum_cars_target.quantile(0.75)
+            
+            # Global CO2 saved (sum across all regions) - calculate only for target year
+            global_co2_target = pd.Series(index=results.simulation_list, dtype=float)
+            for sim in results.simulation_list:
+                total = 0
+                for region in results.tons_co2_saved.keys():
+                    if target_year in results.tons_co2_saved[region].columns:
+                        total += results.tons_co2_saved[region].loc[sim, target_year]
+                global_co2_target.loc[sim] = total
+            
+            co2_bear = global_co2_target.quantile(0.25) if len(global_co2_target) > 0 else 0.0
+            co2_avg = global_co2_target.mean() if len(global_co2_target) > 0 else 0.0
+            co2_bull = global_co2_target.quantile(0.75) if len(global_co2_target) > 0 else 0.0
+            
+            # Primary metrics in 2x2 grid
+            col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("#### Global Robotaxi Miles")
-                st.metric(
-                    label="Bear (25th percentile)",
-                    value=f"{robotaxi_miles_bear / 1e12:.2f}T",
-                    help="25th percentile of simulations"
-                )
-                st.metric(
-                    label="Average",
-                    value=f"{robotaxi_miles_avg / 1e12:.2f}T",
-                    help="Mean of all simulations"
-                )
-                st.metric(
-                    label="Bull (75th percentile)",
-                    value=f"{robotaxi_miles_bull / 1e12:.2f}T",
-                    delta=(robotaxi_miles_bull - robotaxi_miles_avg) / 1e12,
-                    delta_color="normal",
-                    help="75th percentile of simulations"
-                )
-            
-            with col2:
-                st.markdown("#### Tesla Revenue")
-                st.metric(
-                    label="Bear (25th percentile)",
-                    value=f"${revenue_bear / 1e9:.2f}B",
-                    help="25th percentile of simulations"
-                )
+                # Tesla Revenue (Annual)
+                st.markdown("#### 💰 Tesla Revenue (Annual)")
                 st.metric(
                     label="Average",
                     value=f"${revenue_avg / 1e9:.2f}B",
-                    help="Mean of all simulations"
+                    delta=f"Range: ${revenue_bear / 1e9:.1f}B - ${revenue_bull / 1e9:.1f}B",
+                    delta_color="off",
+                    help=f"25th percentile: ${revenue_bear / 1e9:.2f}B | 75th percentile: ${revenue_bull / 1e9:.2f}B"
                 )
+                
+                # Global Fleet Size
+                st.markdown("#### 🚗 Global Fleet Size")
                 st.metric(
-                    label="Bull (75th percentile)",
-                    value=f"${revenue_bull / 1e9:.2f}B",
-                    delta=(revenue_bull - revenue_avg) / 1e9,
-                    delta_color="normal",
-                    help="75th percentile of simulations"
+                    label="Cumulative Cars",
+                    value=f"{fleet_avg / 1e6:.2f}M",
+                    delta=f"Range: {fleet_bear / 1e6:.1f}M - {fleet_bull / 1e6:.1f}M",
+                    delta_color="off",
+                    help=f"25th percentile: {fleet_bear / 1e6:.2f}M | 75th percentile: {fleet_bull / 1e6:.2f}M"
                 )
             
-            with col3:
-                st.markdown("#### CO₂ Saved (USA)")
+            with col2:
+                # Cumulative Revenue
+                st.markdown("#### 📈 Cumulative Revenue")
                 st.metric(
-                    label="Bear (25th percentile)",
-                    value=f"{co2_bear / 1e6:.2f}M tons",
-                    help="25th percentile of simulations"
+                    label=f"Total ({results.years[0]}-{target_year})",
+                    value=f"${cum_revenue_avg / 1e9:.2f}B",
+                    delta=f"Range: ${cum_revenue_bear / 1e9:.1f}B - ${cum_revenue_bull / 1e9:.1f}B",
+                    delta_color="off",
+                    help=f"25th percentile: ${cum_revenue_bear / 1e9:.2f}B | 75th percentile: ${cum_revenue_bull / 1e9:.2f}B"
                 )
+                
+                # Global CO2 Saved
+                st.markdown("#### 🌍 Global CO₂ Saved")
                 st.metric(
-                    label="Average",
-                    value=f"{co2_avg / 1e6:.2f}M tons",
-                    help="Mean of all simulations"
+                    label="Tons Saved",
+                    value=f"{co2_avg / 1e6:.2f}M",
+                    delta=f"Range: {co2_bear / 1e6:.1f}M - {co2_bull / 1e6:.1f}M",
+                    delta_color="off",
+                    help=f"25th percentile: {co2_bear / 1e6:.2f}M | 75th percentile: {co2_bull / 1e6:.2f}M"
                 )
-                st.metric(
-                    label="Bull (75th percentile)",
-                    value=f"{co2_bull / 1e6:.2f}M tons",
-                    delta=(co2_bull - co2_avg) / 1e6,
-                    delta_color="normal",
-                    help="75th percentile of simulations"
-                )
+            
+            # Secondary metrics in expandable section
+            with st.expander("📋 Additional Metrics", expanded=False):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    # Robotaxi Miles
+                    robotaxi_miles_bear = results.robotaxi_miles[target_year].quantile(0.25)
+                    robotaxi_miles_avg = results.robotaxi_miles[target_year].mean()
+                    robotaxi_miles_bull = results.robotaxi_miles[target_year].quantile(0.75)
+                    
+                    st.markdown("**🛣️ Global Robotaxi Miles**")
+                    st.metric(
+                        label="Average",
+                        value=f"{robotaxi_miles_avg / 1e12:.2f}T",
+                        delta=f"Range: {robotaxi_miles_bear / 1e12:.2f}T - {robotaxi_miles_bull / 1e12:.2f}T",
+                        delta_color="off"
+                    )
+                
+                with col2:
+                    # Cars Displaced
+                    if target_year in results.cars_displaced.columns:
+                        displaced_bear = results.cars_displaced[target_year].quantile(0.25)
+                        displaced_avg = results.cars_displaced[target_year].mean()
+                        displaced_bull = results.cars_displaced[target_year].quantile(0.75)
+                        
+                        st.markdown("**🔄 Cars Displaced**")
+                        st.metric(
+                            label="Average",
+                            value=f"{displaced_avg / 1e6:.2f}M",
+                            delta=f"Range: {displaced_bear / 1e6:.2f}M - {displaced_bull / 1e6:.2f}M",
+                            delta_color="off"
+                        )
+                    else:
+                        st.markdown("**🔄 Cars Displaced**")
+                        st.info("Data not available")
+                
+                with col3:
+                    # Car Owner Revenue (Non-Asia)
+                    if len(results.car_owner_revenue) > 0:
+                        owner_rev_mean = results.car_owner_revenue.mean()
+                        owner_rev_p25 = results.car_owner_revenue.quantile(0.25)
+                        owner_rev_p75 = results.car_owner_revenue.quantile(0.75)
+                        
+                        st.markdown("**👤 Car Owner Revenue**")
+                        st.metric(
+                            label="Average (Non-Asia)",
+                            value=f"${owner_rev_mean:,.0f}",
+                            delta=f"Range: ${owner_rev_p25:,.0f} - ${owner_rev_p75:,.0f}",
+                            delta_color="off"
+                        )
+                    else:
+                        st.markdown("**👤 Car Owner Revenue**")
+                        st.info("Data not available")
         else:
             st.warning(f"Target year {target_year} not available in results.")
         
