@@ -13,6 +13,7 @@
 html { background: var(--paper); }
 body { margin: 0; color: var(--ink); background: var(--paper); font-family: Georgia, "Times New Roman", serif; }
 button, input { font: inherit; }
+textarea { font: inherit; }
 button { cursor: pointer; }
 .shell { min-height: 100vh; }
 .topbar { height: 62px; padding: 0 34px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; font-family: Arial, sans-serif; }
@@ -34,6 +35,10 @@ button { cursor: pointer; }
 details { border-top: 1px solid var(--line); padding: 12px 0 2px; font-size: 11px; }
 summary { cursor: pointer; color: var(--muted); }
 .advanced-fields { padding-top: 4px; }
+.json-help { margin: 8px 0; color: var(--muted); line-height: 1.4; }
+.config-json { width: 100%; min-height: 260px; resize: vertical; border: 1px solid #cbd0c8; padding: 8px; background: var(--panel); color: var(--ink); font: 10px/1.45 "SFMono-Regular", Consolas, monospace; }
+.json-button { width: 100%; margin-top: 8px; border: 1px solid var(--ink); padding: 8px; background: transparent; color: var(--ink); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.json-button:hover { background: var(--ink); color: var(--paper); }
 .validation { margin: 12px 0; padding: 9px; background: #f8ded4; color: #8c301d; font-size: 11px; }
 .validation p { margin: 0 0 5px; }.validation p:last-child { margin-bottom: 0; }
 .run-button { width: 100%; margin-top: 17px; border: 0; padding: 13px 15px; background: var(--orange); color: white; font: 11px Arial, sans-serif; letter-spacing: .1em; text-transform: uppercase; display: flex; justify-content: space-between; }

@@ -9,10 +9,27 @@ function cloneConfig(config: SimulationConfig): SimulationConfig {
   return {
     ...config,
     growth: { ...config.growth },
+    generalInputs: Object.fromEntries(
+      Object.entries(config.generalInputs).map(([key, range]) => [key, { ...range }]),
+    ) as SimulationConfig["generalInputs"],
+    growthByYear: Object.fromEntries(
+      Object.entries(config.growthByYear).map(([year, range]) => [year, { ...range }]),
+    ),
+    regionalDistribution: Object.fromEntries(
+      Object.entries(config.regionalDistribution).map(([region, range]) => [region, { ...range }]),
+    ) as SimulationConfig["regionalDistribution"],
     regionalShares: { ...config.regionalShares },
     deploymentDates: Object.fromEntries(
       Object.entries(config.deploymentDates).map(([region, dates]) => [region, { ...dates }]),
     ) as SimulationConfig["deploymentDates"],
+    impact: {
+      ...config.impact,
+      co2PerMile: Object.fromEntries(Object.entries(config.impact.co2PerMile).map(([region, values]) => [region, { ...values }])) as SimulationConfig["impact"]["co2PerMile"],
+      co2Produced: { ...config.impact.co2Produced },
+      productivityPerHour: { ...config.impact.productivityPerHour },
+      gdpByRegion: { ...config.impact.gdpByRegion },
+    },
+    vmt: { ...config.vmt, arimaOrder: [...config.vmt.arimaOrder] as [number, number, number] },
   };
 }
 
@@ -103,6 +120,8 @@ export function RobotaxiLab() {
   const [targetYear, setTargetYear] = useState(2030);
   const [status, setStatus] = useState("Ready to run");
   const [progress, setProgress] = useState(0);
+  const [configJson, setConfigJson] = useState(() => JSON.stringify(DEFAULT_CONFIG, null, 2));
+  const [jsonError, setJsonError] = useState("");
   const workerRef = useRef<Worker | null>(null);
 
   const errors = useMemo(() => validateConfig(config), [config]);
@@ -110,6 +129,7 @@ export function RobotaxiLab() {
   const selectedIndex = result ? yearIndex(result, selectedYear) : 0;
 
   useEffect(() => () => workerRef.current?.terminate(), []);
+  useEffect(() => setConfigJson(JSON.stringify(config, null, 2)), [config]);
 
   const run = () => {
     if (errors.length > 0) return;
@@ -138,9 +158,57 @@ export function RobotaxiLab() {
     worker.postMessage({ config });
   };
 
-  const update = (changes: Partial<SimulationConfig>) => setConfig((current) => ({ ...current, ...changes }));
+  const update = (changes: Partial<SimulationConfig>) => setConfig((current) => {
+    const next = { ...current, ...changes };
+    if (changes.networkParticipation !== undefined) next.generalInputs = { ...current.generalInputs, "Network Participation": { ...current.generalInputs["Network Participation"], bear: changes.networkParticipation } };
+    if (changes.hoursPerDay !== undefined) next.generalInputs = { ...next.generalInputs, "Hours/day": { ...next.generalInputs["Hours/day"], bear: changes.hoursPerDay } };
+    if (changes.milesPerHour !== undefined) next.generalInputs = { ...next.generalInputs, "Miles/hour": { ...next.generalInputs["Miles/hour"], bear: changes.milesPerHour } };
+    if (changes.occupancyPct !== undefined) next.generalInputs = { ...next.generalInputs, "% ocupacy": { ...next.generalInputs["% ocupacy"], bear: changes.occupancyPct } };
+    if (changes.carLifespan !== undefined) next.generalInputs = { ...next.generalInputs, "Car Lifespan": { ...next.generalInputs["Car Lifespan"], bear: changes.carLifespan } };
+    if (changes.pricePerMile !== undefined) next.generalInputs = { ...next.generalInputs, "Price/Mile": { ...next.generalInputs["Price/Mile"], bear: changes.pricePerMile } };
+    if (changes.platformFee !== undefined) next.generalInputs = { ...next.generalInputs, "Platform fee": { ...next.generalInputs["Platform fee"], bear: changes.platformFee } };
+    return cloneConfig(next);
+  });
   const applyPreset = (preset: "base" | "conservative" | "aggressive") => {
-    setConfig((current) => ({ ...cloneConfig(DEFAULT_CONFIG), ...current, ...PRESETS[preset] }));
+    setConfig((current) => {
+      const next = { ...cloneConfig(DEFAULT_CONFIG), ...current, ...PRESETS[preset] };
+      if (next.growth !== current.growth) next.growthByYear = Object.fromEntries(Object.keys(next.growthByYear).map((year) => [year, { ...next.growth }])) as SimulationConfig["growthByYear"];
+      return cloneConfig(next);
+    });
+  };
+  const applyJson = () => {
+    try {
+      const parsed = JSON.parse(configJson) as Partial<SimulationConfig>;
+      const defaults = cloneConfig(DEFAULT_CONFIG);
+      const next = cloneConfig({
+        ...defaults,
+        ...parsed,
+        generalInputs: { ...defaults.generalInputs, ...(parsed.generalInputs ?? {}) },
+        growthByYear: { ...defaults.growthByYear, ...(parsed.growthByYear ?? {}) },
+        regionalDistribution: { ...defaults.regionalDistribution, ...(parsed.regionalDistribution ?? {}) },
+        regionalShares: { ...defaults.regionalShares, ...(parsed.regionalShares ?? {}) },
+        deploymentDates: { ...defaults.deploymentDates, ...(parsed.deploymentDates ?? {}) },
+        impact: {
+          ...defaults.impact,
+          ...(parsed.impact ?? {}),
+          co2PerMile: { ...defaults.impact.co2PerMile, ...(parsed.impact?.co2PerMile ?? {}) },
+          co2Produced: { ...defaults.impact.co2Produced, ...(parsed.impact?.co2Produced ?? {}) },
+          productivityPerHour: { ...defaults.impact.productivityPerHour, ...(parsed.impact?.productivityPerHour ?? {}) },
+          gdpByRegion: { ...defaults.impact.gdpByRegion, ...(parsed.impact?.gdpByRegion ?? {}) },
+        },
+        vmt: { ...defaults.vmt, ...(parsed.vmt ?? {}) },
+      });
+      const nextErrors = validateConfig(next);
+      if (nextErrors.length > 0) {
+        setJsonError(nextErrors.join(" "));
+        return;
+      }
+      setConfig(next);
+      setJsonError("");
+      setStatus("Configuration applied");
+    } catch (error) {
+      setJsonError(error instanceof Error ? error.message : "Configuration JSON is invalid.");
+    }
   };
 
   return (
@@ -158,6 +226,7 @@ export function RobotaxiLab() {
           <NumberField label="Price per mile" value={config.pricePerMile} min={0.1} max={5} step={0.05} suffix=" USD" onChange={(value) => update({ pricePerMile: value })} />
           <NumberField label="Platform fee" value={config.platformFee} min={0} max={0.8} step={0.01} suffix=" share" onChange={(value) => update({ platformFee: value })} />
           <details><summary>Advanced model inputs</summary><div className="advanced-fields"><NumberField label="Occupancy" value={config.occupancyPct} min={0.05} max={1} step={0.01} suffix=" share" onChange={(value) => update({ occupancyPct: value })} /><NumberField label="Car lifespan" value={config.carLifespan} min={3} max={30} step={0.5} suffix=" years" onChange={(value) => update({ carLifespan: value })} /></div></details>
+          <details><summary>Full notebook configuration</summary><p className="json-help">Edit every range, deployment date, impact constant, and VMT setting as JSON.</p><textarea className="config-json" value={configJson} onChange={(event) => setConfigJson(event.target.value)} spellCheck={false} /><button className="json-button" onClick={applyJson}>Apply full config</button>{jsonError ? <p className="validation">{jsonError}</p> : null}</details>
           {errors.length > 0 ? <div className="validation">{errors.map((error) => <p key={error}>{error}</p>)}</div> : null}
           <button className="run-button" disabled={errors.length > 0} onClick={run}>Run simulation <span>↗</span></button>
           <div className="progress-track"><span style={{ width: `${progress * 100}%` }} /></div><p className="status">{status}</p>
