@@ -2,6 +2,8 @@
 
 A Monte Carlo simulation model for analyzing the economic and environmental impact of Tesla's Robotaxi network. This project includes both a Python simulation engine and an interactive Streamlit web application.
 
+The `web/` directory contains the browser rebuild. It uses a typed simulation engine in a Web Worker and can be deployed as a static Next.js application on Vercel. The original Python engine remains the reference implementation for regression checks.
+
 ## 📋 Overview
 
 This simulation models the deployment and operation of Tesla's autonomous robotaxi fleet, providing insights into:
@@ -140,6 +142,16 @@ results = run_simulation(config)
 print(f"Average revenue in 2030: ${results.revenue_tesla_global[2030].mean() / 1e9:.2f}B")
 ```
 
+### Running the browser rebuild
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+See [web/README.md](web/README.md) for browser tests and Vercel deployment commands.
+
 ## 📚 Documentation
 
 Comprehensive documentation is available in the `docs/` directory:
@@ -184,4 +196,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ---
 
 **Note**: This is a research simulation model. Results are projections based on assumptions and should not be considered financial or investment advice.
-
