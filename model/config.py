@@ -59,7 +59,7 @@ class SimulationConfig:
     enable_vmt_forecast: bool = True
     
     # Data file paths
-    data_dir: str = './Data'
+    data_dir: str = './legacy/data'
     
     def __post_init__(self):
         """Initialize deployment_dates if None."""
@@ -73,7 +73,7 @@ class SimulationConfig:
             }
     
     @classmethod
-    def from_defaults(cls, data_dir: str = './Data') -> 'SimulationConfig':
+    def from_defaults(cls, data_dir: str = './legacy/data') -> 'SimulationConfig':
         """
         Load default values from CSV files.
         
@@ -278,4 +278,3 @@ class SimulationConfig:
     def simulation_list(self) -> List[int]:
         """Get list of simulation indices."""
         return list(range(0, self.num_simulations))
-

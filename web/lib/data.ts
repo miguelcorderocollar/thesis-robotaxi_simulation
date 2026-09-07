@@ -72,7 +72,7 @@ export const HISTORICAL_PRODUCTION: Record<Region, number> = {
 export const PRODUCTION_2021_TOTAL = 858000;
 
 // June rolling-12-month values from the notebook's ARIMA(1,1,1) forecast of
-// Data/VMT_US.csv. The workbook only consumes this June series for the US VMT
+// legacy/data/VMT_US.csv. The workbook only consumes this June series for the US VMT
 // percentage output, so shipping the compact derived series keeps the client
 // free of a statistics runtime.
 export const VMT_JUNE_ROLLING_MEAN: Record<number, number> = {

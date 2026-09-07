@@ -142,7 +142,7 @@ Thumbs.db
 *.ipynb_checkpoints
 
 # Data files (optional - uncomment if you don't want to commit data)
-# Data/
+# legacy/data/
 # *.csv
 
 # Temporary files

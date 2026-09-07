@@ -432,7 +432,7 @@ def run_simulation(config: SimulationConfig) -> SimulationResults:
     if not os.path.exists(glob_del_hist_path):
         raise FileNotFoundError(
             f"Historical production data not found at {glob_del_hist_path}. "
-            "Please ensure Data/ directory exists with required CSV files."
+            "Please ensure legacy/data/ exists with required CSV files."
         )
     
     glob_del_hist = pd.read_csv(glob_del_hist_path, index_col=0)
@@ -810,4 +810,3 @@ def run_simulation(config: SimulationConfig) -> SimulationResults:
         vmt_forecast=vmt_forecast,
         us_percentage_vmt=us_percentage_vmt,
     )
-

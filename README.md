@@ -32,7 +32,7 @@ The model makes the assumptions visible and shows how uncertainty in deployment,
 
 ## Development
 
-The live application is in `web/`. The simulation runs in a browser Web Worker. The original notebook and Python implementation remain in the repository as research references.
+The live application is in `web/`. The simulation runs in a browser Web Worker. The original notebook and CSV inputs live under `legacy/`; the Python implementation remains under `model/` as a research reference.
 
 ```bash
 cd web

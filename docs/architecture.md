@@ -3,8 +3,9 @@
 ## Repository layout
 
 ```text
-Data/                         Source CSVs used by the thesis model
-Tesla Robotaxi Model-*.ipynb  Original research notebook
+legacy/                       Original thesis artifacts
+  robotaxi-thesis-model.ipynb Original research notebook
+  data/                        Source CSVs used by the thesis model
 model/                        Python reference implementation
 web/
   app/                        Next.js App Router entry points and styles
@@ -28,7 +29,7 @@ The deployed app is static Next.js output plus a browser worker. Vercel serves t
 
 `web/lib/types.ts` defines the complete browser input and output contract. The JSON editor exposes:
 
-- operating input ranges from `Data/general_inputs.csv`;
+- operating input ranges from `legacy/data/general_inputs.csv`;
 - year-specific production growth ranges;
 - regional production distribution ranges;
 - exact deployment-date ranges;
