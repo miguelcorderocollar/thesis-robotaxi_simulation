@@ -1,7 +1,7 @@
 """
 Tesla Robotaxi Simulation Model
 
-This package contains the core simulation engine, configuration, and plotting utilities.
+This package contains the Python reference simulation engine, configuration, and plotting utilities.
 """
 
 from .config import SimulationConfig
@@ -22,4 +22,3 @@ __all__ = [
     'plot_3_areas',
     'plot_percentage_graph',
 ]
-
