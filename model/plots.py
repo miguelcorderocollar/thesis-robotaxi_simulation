@@ -1,7 +1,7 @@
 """
 Plotting functions for Tesla Robotaxi Simulation.
 
-All functions return matplotlib.figure.Figure objects for Streamlit display.
+All functions return matplotlib.figure.Figure objects for research and notebook use.
 """
 
 import matplotlib.pyplot as plt
@@ -227,4 +227,3 @@ def plot_percentage_graph(
     plt.xticks(years)
     plt.tight_layout()
     return fig
-
