@@ -30,6 +30,34 @@ type MetricKey =
   | "gdp";
 let activeRunDraws = DEFAULT_CONFIG.numSimulations;
 
+const CATEGORY_DEFAULTS: Record<"Network" | "Economics" | "Impact", MetricKey> =
+  {
+    Network: "miles",
+    Economics: "revenue",
+    Impact: "co2",
+  };
+
+function deploymentYear(config: SimulationConfig): number {
+  const value = config.deploymentDates.USA.bear.split("/").at(-1);
+  return Number(value) || new Date().getFullYear() + 1;
+}
+
+function withReleaseYear(
+  config: SimulationConfig,
+  year: number,
+): SimulationConfig {
+  const date = `01/01/${year}`;
+  return cloneConfig({
+    ...config,
+    deploymentDates: Object.fromEntries(
+      REGIONS.map((region) => [
+        region,
+        { min: date, bear: date, bull: date, max: date },
+      ]),
+    ) as SimulationConfig["deploymentDates"],
+  });
+}
+
 function cloneConfig(config: SimulationConfig): SimulationConfig {
   return {
     ...config,
@@ -983,6 +1011,248 @@ const metricItems: {
   },
 ];
 
+const OVERVIEW_KEYS: Record<"Network" | "Economics" | "Impact", MetricKey[]> = {
+  Network: ["miles", "fleet", "production", "milesPerCar"],
+  Economics: ["revenue", "miles", "fleet"],
+  Impact: ["co2", "cars", "hours", "gdp"],
+};
+
+function OverviewDashboard({
+  result,
+  category,
+  selectedYear,
+  selectedIndex,
+  activeMetric,
+  onMetric,
+  onExplore,
+  onPin,
+  runConfig,
+}: {
+  result: SimulationResult;
+  category: "Network" | "Economics" | "Impact";
+  selectedYear: number;
+  selectedIndex: number;
+  activeMetric: MetricKey;
+  onMetric: (metric: MetricKey) => void;
+  onExplore: () => void;
+  onPin: (index: number) => void;
+  runConfig: SimulationConfig;
+}) {
+  const keys = OVERVIEW_KEYS[category];
+  const lead = getMetric(result, activeMetric).series ? activeMetric : keys[0];
+  const metric = getMetric(result, lead);
+  return (
+    <div className="overview-dashboard">
+      <div className="overview-kpis">
+        {keys.map((key) => {
+          const item = getMetric(result, key);
+          const series = item.series;
+          if (!series) return null;
+          return (
+            <button
+              className={`overview-kpi ${key === lead ? "active" : ""}`}
+              key={key}
+              onClick={() => onMetric(key)}
+            >
+              <span>{item.title}</span>
+              <strong>{item.formatter(series.average[selectedIndex])}</strong>
+              <small>
+                P25–P75 · {item.formatter(series.p25[selectedIndex])} to{" "}
+                {item.formatter(series.p75[selectedIndex])}
+              </small>
+            </button>
+          );
+        })}
+      </div>
+      <section className="result-panel overview-chart">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">One view · {category}</p>
+            <h2>{metric.title}</h2>
+          </div>
+          <span className="unit">
+            {metric.unit} · {selectedYear}
+          </span>
+        </div>
+        {metric.series && (
+          <ScenarioChart
+            years={result.years}
+            series={metric.series}
+            color="#cc0000"
+            formatter={metric.formatter}
+            selectedIndex={selectedIndex}
+            onPin={onPin}
+          />
+        )}
+        <p className="chart-definition">{metricDescription(lead)}</p>
+      </section>
+      <section className="result-panel overview-regional">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">At a glance</p>
+            <h2>
+              {category === "Network"
+                ? "Regional fleet pulse"
+                : category === "Economics"
+                  ? "Revenue by region"
+                  : "Impact coverage"}
+            </h2>
+          </div>
+          <span className="unit">{selectedYear}</span>
+        </div>
+        <RegionalBars
+          result={result}
+          selectedIndex={selectedIndex}
+          metric={
+            category === "Network"
+              ? "fleet"
+              : category === "Economics"
+                ? "revenue"
+                : "co2"
+          }
+          runConfig={runConfig}
+        />
+      </section>
+      <button className="explore-prompt" onClick={onExplore}>
+        <span>Explore every measure</span>
+        <small>
+          Switch to Explore for the full metric catalog and annual table ↗
+        </small>
+      </button>
+    </div>
+  );
+}
+
+function ExploreDashboard({
+  result,
+  activeMetric,
+  selectedYear,
+  selectedIndex,
+  onMetric,
+  onPin,
+  runConfig,
+}: {
+  result: SimulationResult;
+  activeMetric: MetricKey;
+  selectedYear: number;
+  selectedIndex: number;
+  onMetric: (metric: MetricKey) => void;
+  onPin: (index: number) => void;
+  runConfig: SimulationConfig;
+}) {
+  const active = getMetric(result, activeMetric);
+  return (
+    <div className="explore-dashboard">
+      <div className="explore-catalog-grid">
+        {metricItems.map((item) => (
+          <button
+            key={item.key}
+            className={`explore-metric-card ${item.key === activeMetric ? "active" : ""}`}
+            onClick={() => onMetric(item.key)}
+          >
+            <span>{item.category}</span>
+            <strong>{item.label}</strong>
+            <small>{item.note}</small>
+            <b>↗</b>
+          </button>
+        ))}
+      </div>
+      <div className="metric-select">
+        <label htmlFor="metric">Selected measure</label>
+        <select
+          id="metric"
+          value={activeMetric}
+          onChange={(e) => onMetric(e.target.value as MetricKey)}
+        >
+          {metricItems.map((item) => (
+            <option key={item.key} value={item.key}>
+              {item.category} / {item.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {active.series ? (
+        <>
+          <div className="metric-grid explore-kpis">
+            <MetricCard
+              label={`${active.title} in ${selectedYear}`}
+              value={active.formatter(active.series.average[selectedIndex])}
+              range={active.unit}
+            />
+            <MetricCard
+              label="Lower quartile · P25"
+              value={active.formatter(active.series.p25[selectedIndex])}
+              range="middle 50% begins"
+            />
+            <MetricCard
+              label="Upper quartile · P75"
+              value={active.formatter(active.series.p75[selectedIndex])}
+              range="middle 50% ends"
+            />
+          </div>
+          <section className="result-panel hero-panel">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Selected output</p>
+                <h2>{active.title}</h2>
+              </div>
+              <span className="unit">{active.unit}</span>
+            </div>
+            <ScenarioChart
+              key={activeMetric}
+              years={result.years}
+              series={active.series}
+              color="#cc0000"
+              formatter={active.formatter}
+              selectedIndex={selectedIndex}
+              onPin={onPin}
+            />
+            <p className="chart-definition">
+              {metricDescription(activeMetric)}
+            </p>
+          </section>
+          <section className="result-panel">
+            <div className="panel-header">
+              <h2>
+                {["cars", "pollution", "vmt"].includes(activeMetric)
+                  ? "United States"
+                  : "Regional breakdown"}
+              </h2>
+              <span className="unit">
+                {selectedYear} · {active.unit}
+              </span>
+            </div>
+            <RegionalBars
+              result={result}
+              selectedIndex={selectedIndex}
+              metric={activeMetric}
+              runConfig={runConfig}
+            />
+          </section>
+          {activeMetric === "revenue" && (
+            <section className="result-panel">
+              <h2>Owner annual revenue</h2>
+              <OwnerLedger result={result} />
+            </section>
+          )}
+          <details className="annual-data">
+            <summary>
+              Open annual data table{" "}
+              <span>Mean, P25 and P75 for every year ↗</span>
+            </summary>
+            <DataTable result={result} metric={activeMetric} />
+          </details>
+        </>
+      ) : (
+        <section className="result-panel unavailable">
+          <h2>{active.title} is disabled</h2>
+          <p>Enable US VMT in Advanced assumptions and run again.</p>
+        </section>
+      )}
+    </div>
+  );
+}
+
 export function RobotaxiLab() {
   const [config, setConfig] = useState<SimulationConfig>(() =>
     cloneConfig(DEFAULT_CONFIG),
@@ -1003,6 +1273,7 @@ export function RobotaxiLab() {
   >("base");
   const [mobileInputs, setMobileInputs] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [configJson, setConfigJson] = useState(() =>
     JSON.stringify(DEFAULT_CONFIG, null, 2),
   );
@@ -1013,6 +1284,9 @@ export function RobotaxiLab() {
     ? targetYear
     : (result?.years.at(-1) ?? 2030);
   const selectedIndex = result ? yearIndex(result, selectedYear) : 0;
+  const activeCategory =
+    metricItems.find((item) => item.key === activeMetric)?.category ??
+    "Network";
   const draftChanged = Boolean(
     lastRunConfig && JSON.stringify(config) !== JSON.stringify(lastRunConfig),
   );
@@ -1082,13 +1356,13 @@ export function RobotaxiLab() {
     };
     worker.postMessage({ config: cloneConfig(config) });
   };
-  useEffect(() => {
-    run();
-    return () => {
+  useEffect(
+    () => () => {
       workerRef.current?.terminate();
       workerRef.current = null;
-    };
-  }, []);
+    },
+    [],
+  );
   const cancel = () => {
     workerRef.current?.terminate();
     workerRef.current = null;
@@ -1158,6 +1432,11 @@ export function RobotaxiLab() {
         };
       return cloneConfig(next);
     });
+  };
+  const updateReleaseYear = (year: number) => {
+    setActivePreset("custom");
+    setConfig((current) => withReleaseYear(current, year));
+    setStatus("Release year staged. Run to update results.");
   };
   const applyPreset = (preset: "base" | "conservative" | "aggressive") => {
     setActivePreset(preset);
@@ -1263,7 +1542,6 @@ export function RobotaxiLab() {
     }
   };
 
-  const active = result ? getMetric(result, activeMetric) : null;
   const setYearFromChart = (index: number) => {
     if (result) setTargetYear(result.years[index]);
   };
@@ -1285,10 +1563,21 @@ export function RobotaxiLab() {
           <span className="local-status">
             <i /> local execution
           </span>
+          <button
+            className="info-button"
+            type="button"
+            aria-label="About this model"
+            onClick={() => setInfoOpen(true)}
+          >
+            i
+          </button>
           <a href="#method">Method</a>
         </div>
       </header>
-      <div className="app-grid" id="top">
+      <div
+        className={`app-grid ${result ? "has-result" : "empty-layout"}`}
+        id="top"
+      >
         <button
           className="mobile-input-toggle secondary-button"
           aria-expanded={mobileInputs}
@@ -1400,6 +1689,19 @@ export function RobotaxiLab() {
                   display={formatPercent(config.platformFee)}
                   onChange={(value) => update({ platformFee: value })}
                 />
+                <SliderField
+                  label="Robotaxi release year"
+                  value={deploymentYear(config)}
+                  min={new Date().getFullYear() + 1}
+                  max={2040}
+                  step={1}
+                  display={String(deploymentYear(config))}
+                  onChange={updateReleaseYear}
+                />
+                <p className="field-help">
+                  One shared launch year for every region. The model starts
+                  deployment after this date.
+                </p>
               </div>
               <div className="control-section compact-controls">
                 <div className="section-kicker">Run shape</div>
@@ -1559,15 +1861,20 @@ export function RobotaxiLab() {
                 <img src="/robotaxi-outline.svg" alt="" />
               </div>
               <div>
-                <p className="eyebrow">Reference run</p>
-                <h2>Start with the thesis scenario.</h2>
+                <p className="eyebrow">Before you run</p>
+                <h2>Set the assumptions in the controls.</h2>
                 <p>
-                  The model runs entirely in this browser tab. Your first result
-                  will include annual miles, revenue, fleet, impact and regional
-                  uncertainty.
+                  Choose a reference starting point or tune the simple controls.
+                  The model will stay idle until you press Run simulation.
                 </p>
+                <div className="empty-guide">
+                  <span>01</span>
+                  <strong>Choose a starting point</strong>
+                  <span>02</span>
+                  <strong>Run the model</strong>
+                </div>
                 <button className="primary-button" type="button" onClick={run}>
-                  Run reference model <span>↗</span>
+                  Run simulation <span>↗</span>
                 </button>
               </div>
             </div>
@@ -1595,127 +1902,47 @@ export function RobotaxiLab() {
                 </span>
               </div>
               <nav className="question-tabs" aria-label="Research question">
-                {["Network", "Economics", "Impact"].map((category) => (
-                  <button
-                    key={category}
-                    className={
-                      metricItems.find((item) => item.key === activeMetric)
-                        ?.category === category
-                        ? "active"
-                        : ""
-                    }
-                    onClick={() =>
-                      setActiveMetric(
-                        category === "Network"
-                          ? "miles"
-                          : category === "Economics"
-                            ? "revenue"
-                            : "co2",
-                      )
-                    }
-                  >
-                    {category}
-                  </button>
-                ))}
-              </nav>
-              <div className="metric-select">
-                <label htmlFor="metric">Explore a measure</label>
-                <select
-                  id="metric"
-                  value={activeMetric}
-                  onChange={(e) => setActiveMetric(e.target.value as MetricKey)}
-                >
-                  {metricItems.map((item) => (
-                    <option key={item.key} value={item.key}>
-                      {item.category} / {item.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {active?.series ? (
-                <>
-                  <div className="metric-grid">
-                    <MetricCard
-                      label={`${active.title} in ${selectedYear}`}
-                      value={active.formatter(
-                        active.series.average[selectedIndex],
-                      )}
-                      range={active.unit}
-                    />
-                    <MetricCard
-                      label="Lower quartile · P25"
-                      value={active.formatter(active.series.p25[selectedIndex])}
-                      range="25% of draws fall below"
-                    />
-                    <MetricCard
-                      label="Upper quartile · P75"
-                      value={active.formatter(active.series.p75[selectedIndex])}
-                      range="75% of draws fall below"
-                    />
-                  </div>
-                  <section className="result-panel hero-panel">
-                    <div className="panel-header">
-                      <div>
-                        <p className="eyebrow">
-                          {running ? "Previous run" : "Completed scenario"}
-                        </p>
-                        <h2>{active.title}</h2>
-                      </div>
-                      <span className="unit">{active.unit}</span>
-                    </div>
-                    <ScenarioChart
-                      key={activeMetric}
-                      years={result.years}
-                      series={active.series}
-                      color="#cc0000"
-                      formatter={active.formatter}
-                      selectedIndex={selectedIndex}
-                      onPin={setYearFromChart}
-                    />
-                    <p className="chart-definition">
-                      {metricDescription(activeMetric)}
-                    </p>
-                  </section>
-                  <section className="result-panel">
-                    <div className="panel-header">
-                      <h2>
-                        {["cars", "pollution", "vmt"].includes(activeMetric)
-                          ? "United States"
-                          : "Regional breakdown"}
-                      </h2>
-                      <span className="unit">
-                        {selectedYear} · {active.unit}
-                      </span>
-                    </div>
-                    <RegionalBars
-                      result={result}
-                      selectedIndex={selectedIndex}
-                      metric={activeMetric}
-                      runConfig={lastRunConfig ?? config}
-                    />
-                  </section>
-                  {activeMetric === "revenue" && (
-                    <section className="result-panel">
-                      <h2>Owner annual revenue</h2>
-                      <OwnerLedger result={result} />
-                    </section>
-                  )}
-                  {resultDepth === "explore" ? (
-                    <DataTable result={result} metric={activeMetric} />
-                  ) : (
+                {(["Network", "Economics", "Impact"] as const).map(
+                  (category) => (
                     <button
-                      className="explore-prompt"
-                      onClick={() => setResultDepth("explore")}
+                      key={category}
+                      className={
+                        metricItems.find((item) => item.key === activeMetric)
+                          ?.category === category
+                          ? "active"
+                          : ""
+                      }
+                      onClick={() =>
+                        setActiveMetric(CATEGORY_DEFAULTS[category])
+                      }
                     >
-                      View annual data <span>Mean and both quartiles ↗</span>
+                      {category}
                     </button>
-                  )}
-                </>
+                  ),
+                )}
+              </nav>
+              {resultDepth === "overview" ? (
+                <OverviewDashboard
+                  result={result}
+                  category={activeCategory}
+                  selectedYear={selectedYear}
+                  selectedIndex={selectedIndex}
+                  activeMetric={activeMetric}
+                  onMetric={setActiveMetric}
+                  onExplore={() => setResultDepth("explore")}
+                  onPin={setYearFromChart}
+                  runConfig={lastRunConfig ?? config}
+                />
               ) : (
-                <section className="result-panel unavailable">
-                  <h2>{active?.title} is disabled</h2>
-                  <p>Enable US VMT in Advanced assumptions and run again.</p>
-                </section>
+                <ExploreDashboard
+                  result={result}
+                  activeMetric={activeMetric}
+                  selectedYear={selectedYear}
+                  selectedIndex={selectedIndex}
+                  onMetric={setActiveMetric}
+                  onPin={setYearFromChart}
+                  runConfig={lastRunConfig ?? config}
+                />
               )}
             </div>
           ) : null}
@@ -1734,7 +1961,83 @@ export function RobotaxiLab() {
           onClose={() => setAdvancedOpen(false)}
         />
       ) : null}
+      {infoOpen ? <InfoDialog onClose={() => setInfoOpen(false)} /> : null}
     </main>
+  );
+}
+
+function InfoDialog({ onClose }: { onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      className="info-modal"
+      onCancel={onClose}
+      onClose={onClose}
+    >
+      <header className="modal-header">
+        <div>
+          <p className="eyebrow">About the workspace</p>
+          <h2>How to read this model</h2>
+          <p>
+            This is a browser-based Monte Carlo model. Change the assumptions,
+            run it, and inspect the resulting range.
+          </p>
+        </div>
+        <button
+          className="icon-button"
+          type="button"
+          aria-label="Close model information"
+          onClick={onClose}
+        >
+          ×
+        </button>
+      </header>
+      <div className="info-content">
+        <section>
+          <h3>What the numbers mean</h3>
+          <p>
+            The large value is the mean across simulation draws. P25 to P75 is
+            the middle 50% of draws, not a confidence interval or a guaranteed
+            low and high.
+          </p>
+        </section>
+        <section>
+          <h3>What changes a result</h3>
+          <p>
+            Simple controls edit the lower assumption in each distribution.
+            Advanced inputs expose the full minimum, lower, upper and maximum
+            range. Both modes edit the same draft.
+          </p>
+        </section>
+        <section>
+          <h3>What is covered</h3>
+          <p>
+            Fleet, miles and revenue are modeled globally. CO₂, GDP and other
+            impact outputs have specific regional coverage shown beside each
+            result. "Not modeled" means the engine has no estimate for that
+            region.
+          </p>
+        </section>
+        <section>
+          <h3>How to use the views</h3>
+          <p>
+            Overview keeps the key KPIs in one place. Explore opens the complete
+            metric catalog, one selected chart, regional context and the annual
+            data table. Pin a year with the slider or chart.
+          </p>
+        </section>
+      </div>
+      <footer className="modal-footer">
+        <span>Runs stay on this device.</span>
+        <button className="primary-button" type="button" onClick={onClose}>
+          Close
+        </button>
+      </footer>
+    </dialog>
   );
 }
 

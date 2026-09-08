@@ -54,11 +54,36 @@ export const REGIONAL_DISTRIBUTION: Record<Region, DistributionRange> = {
 };
 
 export const DEPLOYMENT_DATES: Record<Region, DeploymentRange> = {
-  USA: { min: "01/09/2022", bear: "01/07/2023", bull: "01/10/2024", max: "01/01/2029" },
-  Canada: { min: "01/03/2023", bear: "01/10/2023", bull: "01/12/2024", max: "01/01/2029" },
-  Europe: { min: "01/08/2023", bear: "01/08/2024", bull: "01/12/2025", max: "01/01/2030" },
-  China: { min: "01/03/2023", bear: "01/12/2023", bull: "01/02/2025", max: "01/01/2030" },
-  "APAC excl China": { min: "01/08/2023", bear: "01/05/2024", bull: "01/08/2025", max: "01/01/2030" },
+  USA: {
+    min: "01/01/2027",
+    bear: "01/01/2027",
+    bull: "01/01/2027",
+    max: "01/01/2027",
+  },
+  Canada: {
+    min: "01/01/2027",
+    bear: "01/01/2027",
+    bull: "01/01/2027",
+    max: "01/01/2027",
+  },
+  Europe: {
+    min: "01/01/2027",
+    bear: "01/01/2027",
+    bull: "01/01/2027",
+    max: "01/01/2027",
+  },
+  China: {
+    min: "01/01/2027",
+    bear: "01/01/2027",
+    bull: "01/01/2027",
+    max: "01/01/2027",
+  },
+  "APAC excl China": {
+    min: "01/01/2027",
+    bear: "01/01/2027",
+    bull: "01/01/2027",
+    max: "01/01/2027",
+  },
 };
 
 export const HISTORICAL_PRODUCTION: Record<Region, number> = {
@@ -167,10 +192,16 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   growth: GROWTH_BY_YEAR[2022],
   generalInputs: { ...INPUT_RANGES },
   growthByYear: Object.fromEntries(
-    Object.entries(GROWTH_BY_YEAR).map(([year, range]) => [String(year), { ...range }]),
+    Object.entries(GROWTH_BY_YEAR).map(([year, range]) => [
+      String(year),
+      { ...range },
+    ]),
   ),
   regionalDistribution: Object.fromEntries(
-    Object.entries(REGIONAL_DISTRIBUTION).map(([region, range]) => [region, { ...range }]),
+    Object.entries(REGIONAL_DISTRIBUTION).map(([region, range]) => [
+      region,
+      { ...range },
+    ]),
   ) as Record<Region, DistributionRange>,
   regionalShares: Object.fromEntries(
     Object.entries(normalizedRegionalShares).map(([region, value]) => [
