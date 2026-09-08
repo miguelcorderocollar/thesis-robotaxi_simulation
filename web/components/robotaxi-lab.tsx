@@ -620,8 +620,8 @@ function AdvancedEditor({
                 {(
                   (path[0] === "deploymentDates"
                     ? {
-                        bear: "Pessimistic date",
-                        bull: "Optimistic date",
+                        bear: "Lower estimate",
+                        bull: "Upper estimate",
                         min: "Earliest",
                         max: "Latest",
                       }
@@ -733,7 +733,7 @@ function AdvancedEditor({
           <h3>{labels[tab]}</h3>
           <p className="control-note">
             {tab === "deploymentDates"
-              ? "Dates are displayed in your browser locale. The model stores day/month/year. Optimistic deployment precedes pessimistic deployment."
+              ? "Dates move from earliest to latest. The lower and upper estimates define a regional deployment window."
               : "Ranges use native model units. Fractions: 0.20 = 20%. Minimum ≤ lower ≤ upper ≤ maximum."}
           </p>
           {tab === "json" ? (
